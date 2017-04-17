@@ -1,7 +1,8 @@
 GPU=0
 CUDNN=0
-OPENCV=0
+OPENCV=1
 DEBUG=0
+PYTHON=1
 
 ARCH= -gencode arch=compute_20,code=[sm_20,sm_21] \
       -gencode arch=compute_30,code=sm_30 \
@@ -14,14 +15,15 @@ ARCH= -gencode arch=compute_20,code=[sm_20,sm_21] \
 
 VPATH=./src/
 EXEC=darknet
+PYLIB=pydarknet.so
 OBJDIR=./obj/
 
 CC=gcc
-NVCC=nvcc 
+NVCC=/usr/local/cuda/bin/nvcc 
 OPTS=-Ofast
 LDFLAGS= -lm -pthread 
 COMMON= 
-CFLAGS=-Wall -Wfatal-errors 
+CFLAGS=-Wall -Wfatal-errors -fPIC
 
 ifeq ($(DEBUG), 1) 
 OPTS=-O0 -g
@@ -34,6 +36,12 @@ COMMON+= -DOPENCV
 CFLAGS+= -DOPENCV
 LDFLAGS+= `pkg-config --libs opencv` 
 COMMON+= `pkg-config --cflags opencv` 
+endif
+
+ifeq ($(PYTHON), 1)
+PINCLUDE=$(shell python-config --prefix)
+COMMON+= -I$(PINCLUDE)/include/python2.7
+LDFLAGS+= -L$(PINCLUDE)/lib -lpython2.7
 endif
 
 ifeq ($(GPU), 1) 
@@ -49,6 +57,11 @@ LDFLAGS+= -lcudnn
 endif
 
 OBJ=gemm.o utils.o cuda.o deconvolutional_layer.o convolutional_layer.o list.o image.o activations.o im2col.o col2im.o blas.o crop_layer.o dropout_layer.o maxpool_layer.o softmax_layer.o data.o matrix.o network.o connected_layer.o cost_layer.o parser.o option_list.o darknet.o detection_layer.o captcha.o route_layer.o writing.o box.o nightmare.o normalization_layer.o avgpool_layer.o coco.o dice.o yolo.o detector.o layer.o compare.o regressor.o classifier.o local_layer.o swag.o shortcut_layer.o activation_layer.o rnn_layer.o gru_layer.o rnn.o rnn_vid.o crnn_layer.o demo.o tag.o cifar.o go.o batchnorm_layer.o art.o region_layer.o reorg_layer.o lsd.o super.o voxel.o tree.o
+
+ifeq ($(PYTHON), 1)
+ OBJ+=pydarknet.o
+endif
+
 ifeq ($(GPU), 1) 
 LDFLAGS+= -lstdc++ 
 OBJ+=convolutional_kernels.o deconvolutional_kernels.o activation_kernels.o im2col_kernels.o col2im_kernels.o blas_kernels.o crop_layer_kernels.o dropout_layer_kernels.o maxpool_layer_kernels.o network_kernels.o avgpool_layer_kernels.o
@@ -61,6 +74,10 @@ all: obj backup results $(EXEC)
 
 $(EXEC): $(OBJS)
 	$(CC) $(COMMON) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+ifeq ($(PYTHON), 1)
+	$(CC) -shared $(COMMON) $(CFLAGS) $^ -o $(PYLIB) $(LDFLAGS)
+endif
+
 
 $(OBJDIR)%.o: %.c $(DEPS)
 	$(CC) $(COMMON) $(CFLAGS) -c $< -o $@
@@ -78,5 +95,5 @@ results:
 .PHONY: clean
 
 clean:
-	rm -rf $(OBJS) $(EXEC)
+	rm -rf $(OBJS) $(EXEC) $(PYLIB)
 

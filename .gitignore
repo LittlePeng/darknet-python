@@ -24,3 +24,6 @@ ehthumbs.db
 Icon?
 Thumbs.db
 *.swp
+darknet-xcode
+*.weights
+*.so
