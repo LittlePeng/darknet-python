@@ -9,8 +9,6 @@
 #include "option_list.h"
 #include "blas.h"
 
-static int coco_ids[] = {1,2,3,4,5,6,7,8,9,10,11,13,14,15,16,17,18,19,20,21,22,23,24,25,27,28,31,32,33,34,35,36,37,38,39,40,41,42,43,44,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,67,70,72,73,74,75,76,77,78,79,80,81,82,84,85,86,87,88,89,90};
-
 static char **pyg_names = NULL;
 static image **pyg_alphabet = NULL;
 static network pyg_net;
@@ -106,6 +104,16 @@ static PyObject * pydetect(image im, char* outfile, float thresh) {
         }
     }
     
+    assert(pyg_net.w == pyg_net.h);
+    float rate = (float) (im.w > im.h ? im.w : im.h) / pyg_net.w;
+    int pending_tb = 0;
+    int pending_lr = 0;
+    if(im.w > im.h){
+        pending_tb = (float)(im.w - im.h)/(2*im.w) * pyg_net.w;
+    }else{
+        pending_lr = (float)(im.h - im.w)/(2*im.h) * pyg_net.w;
+    }
+    //printf("net: %d %d, rate:%f \n", pyg_net.w, pyg_net.h, rate);
     PyObject *retval = PyList_New(lsize); // The returned Python object
     int lindex = 0;
     for(int i = 0; i < num; ++i){
@@ -114,10 +122,10 @@ static PyObject * pydetect(image im, char* outfile, float thresh) {
         if(prob > thresh){
             box b = boxes[i];
             
-            int left  = (b.x-b.w/2.)*im.w;
-            int right = (b.x+b.w/2.)*im.w;
-            int top   = (b.y-b.h/2.)*im.h;
-            int bot   = (b.y+b.h/2.)*im.h;
+            int left  = ((b.x-b.w/2.)*sized.w - pending_lr) * rate;
+            int right = ((b.x+b.w/2.)*sized.w - pending_lr) * rate;
+            int top   = ((b.y-b.h/2.)*sized.h - pending_tb) * rate;
+            int bot   = ((b.y+b.h/2.)*sized.h - pending_tb) * rate;
             
             if(left < 0) left = 0;
             if(right > im.w-1) right = im.w-1;
@@ -136,19 +144,7 @@ static PyObject * pydetect(image im, char* outfile, float thresh) {
 }
 
 static PyObject *
-pydarknet_system(PyObject *self, PyObject *args)
-{
-    const char *command;
-    int sts;
-
-    if (!PyArg_ParseTuple(args, "s", &command))
-        return NULL;
-    sts = system(command);
-    return Py_BuildValue("i", sts);
-}
-
-static PyObject *
-pydarknet_load(PyObject *self, PyObject *args)
+libpydarknet_load(PyObject *self, PyObject *args)
 {
     char *cfg_file;
     char *model_file;
@@ -163,7 +159,7 @@ pydarknet_load(PyObject *self, PyObject *args)
 }
 
 static PyObject *
-pydarknet_detect_file(PyObject *self, PyObject *args)
+libpydarknet_detect_file(PyObject *self, PyObject *args)
 {
     char* file_path;
     if(pyg_names == NULL){
@@ -179,7 +175,7 @@ pydarknet_detect_file(PyObject *self, PyObject *args)
 }
 
 static PyObject *
-pydarknet_detect(PyObject *self, PyObject *args)
+libpydarknet_detect(PyObject *self, PyObject *args)
 {
     if(pyg_names == NULL){
         printf("weights not load!\n");
@@ -200,8 +196,7 @@ pydarknet_detect(PyObject *self, PyObject *args)
         return NULL;
     }
     int size = height*width*channel;
-    printf("width = %d height =%d channel=%d threshold=%f size=%zd\n",
-           width, height, channel, threshold, size);
+    //printf("width = %d height =%d channel=%d threshold=%f size=%zd\n", width, height, channel, threshold, size);
     
     
     image img = make_image(width, height, channel);
@@ -226,18 +221,18 @@ pydarknet_detect(PyObject *self, PyObject *args)
 
 static PyMethodDef pyMethods[] =
 {
-      {"load", pydarknet_load, METH_VARARGS, "load"},
-      {"detect_file", pydarknet_detect_file, METH_VARARGS, "detect_file"},
-      {"detect", pydarknet_detect, METH_VARARGS, "detect"},
+      {"load", libpydarknet_load, METH_VARARGS, "load"},
+      {"detect_file", libpydarknet_detect_file, METH_VARARGS, "detect_file"},
+      {"detect", libpydarknet_detect, METH_VARARGS, "detect"},
       {NULL, NULL}
 };
 
 PyMODINIT_FUNC
-initpydarknet(void)
+initlibpydarknet(void)
 {
     PyObject *m;
     
-    m = Py_InitModule("pydarknet", pyMethods);
+    m = Py_InitModule("libpydarknet", pyMethods);
     if (m == NULL)
         return;
 }

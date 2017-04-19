@@ -15,7 +15,7 @@ ARCH= -gencode arch=compute_20,code=[sm_20,sm_21] \
 
 VPATH=./src/
 EXEC=darknet
-PYLIB=pydarknet.so
+PYLIB=libpydarknet.so
 OBJDIR=./obj/
 
 CC=gcc

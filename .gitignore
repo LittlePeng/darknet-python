@@ -27,3 +27,4 @@ Thumbs.db
 darknet-xcode
 *.weights
 *.so
+*.pyc
